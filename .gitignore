@@ -1,0 +1,9 @@
+.DS_Store
+.cache/
+artifacts/
+.idea/
+.vscode/
+build/
+cmake-build-*/
+JUCE/
+*.xcodeproj/

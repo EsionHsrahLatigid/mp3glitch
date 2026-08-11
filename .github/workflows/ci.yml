@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plugin:
+    name: Plugin build and integration tests
+    uses: EsionHsrahLatigid/juce-ci/.github/workflows/juce-cmake.yml@98fcb96e64011725ed842941b350afe013e9ba7d
+    with:
+      runs-on: macos-14
+      dependency-cache-key: juce-8.0.15
+      cmake-options: >-
+        -DMP3GLITCH_BUILD_PLUGIN=ON
+        -DMP3GLITCH_BUILD_TESTS=ON
+      build-targets: >-
+        MP3Glitch_Artifacts
+        MP3GlitchIntegrationTests
+      artifact-name: MP3Glitch-macOS
+      artifact-path: |
+        artifacts/Release/VST3/
+        artifacts/Release/AU/
+        artifacts/Release/Standalone/
