@@ -70,6 +70,7 @@ private:
     std::vector<float> lastFrameL;
     std::vector<float> lastFrameR;
     std::vector<float> mdctCoeffs;
+    juce::AudioBuffer<float> dryBuffer;
     int framePosition = 0;
     int repeatCount = 0;
     
