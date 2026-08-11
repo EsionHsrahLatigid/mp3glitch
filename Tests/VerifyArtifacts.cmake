@@ -19,30 +19,30 @@ if(NOT EXISTS "${standalone}")
     message(FATAL_ERROR "Missing staged Standalone app: ${standalone}")
 endif()
 
+set(module_info "${vst3}/Contents/Resources/moduleinfo.json")
+if(NOT EXISTS "${module_info}")
+    message(FATAL_ERROR "Missing staged VST3 moduleinfo.json: ${module_info}")
+endif()
+
+if(NOT DEFINED Python3_EXECUTABLE)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+endif()
+
+execute_process(
+    COMMAND ${Python3_EXECUTABLE} -m json.tool "${module_info}"
+    RESULT_VARIABLE json_result
+    OUTPUT_QUIET
+    ERROR_VARIABLE json_error)
+if(NOT json_result EQUAL 0)
+    message(FATAL_ERROR "Invalid strict JSON in ${module_info}: ${json_error}")
+endif()
+
 if(MP3GLITCH_EXPECT_AU)
-    set(module_info "${vst3}/Contents/Resources/moduleinfo.json")
     set(standalone_plist "${standalone}/Contents/Info.plist")
     set(au "${MP3GLITCH_STAGED_DIR}/AU/MP3 Glitch.component")
 
-    if(NOT EXISTS "${module_info}")
-        message(FATAL_ERROR "Missing staged VST3 moduleinfo.json: ${module_info}")
-    endif()
-
     if(NOT EXISTS "${standalone_plist}")
         message(FATAL_ERROR "Missing staged Standalone Info.plist: ${standalone_plist}")
-    endif()
-
-    if(NOT DEFINED Python3_EXECUTABLE)
-        find_package(Python3 COMPONENTS Interpreter REQUIRED)
-    endif()
-
-    execute_process(
-        COMMAND ${Python3_EXECUTABLE} -m json.tool "${module_info}"
-        RESULT_VARIABLE json_result
-        OUTPUT_QUIET
-        ERROR_VARIABLE json_error)
-    if(NOT json_result EQUAL 0)
-        message(FATAL_ERROR "Invalid strict JSON in ${module_info}: ${json_error}")
     endif()
 
     if(NOT EXISTS "${au}")
