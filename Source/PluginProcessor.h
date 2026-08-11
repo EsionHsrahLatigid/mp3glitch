@@ -51,11 +51,8 @@ private:
     void applyQuantizationDistortion(float* data, int size);
     
     double sampleRate = 44100.0;
-    int blockSize = 512;
-    
     // MP3フレームサイズ (576 samples for Layer III)
     static constexpr int MP3_FRAME_SIZE = 576;
-    static constexpr int MDCT_SIZE = 18;  // MP3 uses 18-point MDCT
     
     // パラメータ
     float glitchAmount = 0.5f;
@@ -73,10 +70,7 @@ private:
     std::vector<float> lastFrameL;
     std::vector<float> lastFrameR;
     std::vector<float> mdctCoeffs;
-    std::vector<float> overlapBuffer;
-    
     int framePosition = 0;
-    bool frameDropped = false;
     int repeatCount = 0;
     
     // 乱数生成

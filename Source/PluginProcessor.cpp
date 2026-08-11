@@ -17,12 +17,11 @@ MP3GlitchProcessor::MP3GlitchProcessor() : rng(std::random_device{}()) {
   lastFrameL.resize(MP3_FRAME_SIZE, 0.0f);
   lastFrameR.resize(MP3_FRAME_SIZE, 0.0f);
   mdctCoeffs.resize(MP3_FRAME_SIZE, 0.0f);
-  overlapBuffer.resize(MP3_FRAME_SIZE, 0.0f);
 }
 
 void MP3GlitchProcessor::prepare(double sr, int samplesPerBlock) {
+  juce::ignoreUnused(samplesPerBlock);
   sampleRate = sr;
-  blockSize = samplesPerBlock;
 
   // ローパスフィルタの設定（MP3の16kHz帯域制限をシミュレート）
   auto coeffs =
@@ -44,7 +43,6 @@ void MP3GlitchProcessor::reset() {
   framePosition = 0;
   preEchoWritePos = 0;
   repeatCount = 0;
-  frameDropped = false;
 
   lowpassFilterL.reset();
   lowpassFilterR.reset();
@@ -267,7 +265,6 @@ void MP3GlitchProcessor::repeatLastFrame() {
 }
 
 void MP3GlitchProcessor::dropFrame() {
-  frameDropped = true;
   // フレームドロップ時はゼロで埋める（無音グリッチ）
   std::fill(frameBufferL.begin(), frameBufferL.begin() + MP3_FRAME_SIZE, 0.0f);
   std::fill(frameBufferR.begin(), frameBufferR.begin() + MP3_FRAME_SIZE, 0.0f);
