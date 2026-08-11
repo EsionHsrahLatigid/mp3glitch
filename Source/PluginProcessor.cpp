@@ -57,28 +57,43 @@ void MP3GlitchProcessor::process(juce::AudioBuffer<float> &buffer) {
   if (numChannels < 1)
     return;
 
-  const bool canUseDryBuffer = numSamples <= dryBuffer.getNumSamples();
+  const int dryBufferSamples = dryBuffer.getNumSamples();
+  if (dryBufferSamples <= 0)
+    return;
+
+  for (int startSample = 0; startSample < numSamples; startSample += dryBufferSamples) {
+    const int chunkSamples = std::min(dryBufferSamples, numSamples - startSample);
+    processChunk(buffer, startSample, chunkSamples);
+  }
+}
+
+void MP3GlitchProcessor::processChunk(juce::AudioBuffer<float> &buffer,
+                                      int startSample, int numSamples) {
+  const int numChannels = buffer.getNumChannels();
   const int dryChannels = std::min(numChannels, dryBuffer.getNumChannels());
-  if (canUseDryBuffer)
-    dryBuffer.clear(0, 0, numSamples);
 
   float *leftChannel = buffer.getWritePointer(0);
   float *rightChannel = numChannels > 1 ? buffer.getWritePointer(1) : nullptr;
 
   for (int i = 0; i < numSamples; ++i) {
-    leftChannel[i] = std::isfinite(leftChannel[i]) ? leftChannel[i] : 0.0f;
+    const int sample = startSample + i;
+
+    leftChannel[sample] =
+        std::isfinite(leftChannel[sample]) ? leftChannel[sample] : 0.0f;
     if (rightChannel)
-      rightChannel[i] = std::isfinite(rightChannel[i]) ? rightChannel[i] : 0.0f;
-    if (canUseDryBuffer) {
-      dryBuffer.setSample(0, i, leftChannel[i]);
-      if (rightChannel)
-        dryBuffer.setSample(1, i, rightChannel[i]);
-    }
+      rightChannel[sample] =
+          std::isfinite(rightChannel[sample]) ? rightChannel[sample] : 0.0f;
+
+    if (dryChannels > 0)
+      dryBuffer.setSample(0, i, leftChannel[sample]);
+    if (dryChannels > 1 && rightChannel)
+      dryBuffer.setSample(1, i, rightChannel[sample]);
 
     // フレームバッファに蓄積
-    frameBufferL[framePosition] = leftChannel[i];
+    const auto frameIndex = static_cast<size_t>(framePosition);
+    frameBufferL[frameIndex] = leftChannel[sample];
     if (rightChannel)
-      frameBufferR[framePosition] = rightChannel[i];
+      frameBufferR[frameIndex] = rightChannel[sample];
 
     framePosition++;
 
@@ -100,32 +115,32 @@ void MP3GlitchProcessor::process(juce::AudioBuffer<float> &buffer) {
     // 処理済みサンプルを出力
     int outputPos =
         (framePosition > 0) ? framePosition - 1 : MP3_FRAME_SIZE - 1;
-    leftChannel[i] = frameBufferL[outputPos];
+    const auto outputIndex = static_cast<size_t>(outputPos);
+    leftChannel[sample] = frameBufferL[outputIndex];
     if (rightChannel)
-      rightChannel[i] = frameBufferR[outputPos];
+      rightChannel[sample] = frameBufferR[outputIndex];
   }
 
   // バンド制限を適用（MP3の高域カット）
   if (glitchAmount > 0.3f) {
-    applyBandLimiting(buffer);
+    applyBandLimiting(buffer, startSample, numSamples);
   }
 
   // プリエコーを適用
   if (glitchAmount > 0.5f) {
-    applyPreEcho(buffer);
+    applyPreEcho(buffer, startSample, numSamples);
   }
 
   // ドライ/ウェットミックス
   if (dryWetMix < 1.0f) {
     for (int ch = 0; ch < numChannels; ++ch) {
       float *wet = buffer.getWritePointer(ch);
-      const float *dry = canUseDryBuffer && ch < dryChannels
-                             ? dryBuffer.getReadPointer(ch)
-                             : nullptr;
+      const float *dry = ch < dryChannels ? dryBuffer.getReadPointer(ch) : nullptr;
 
       for (int i = 0; i < numSamples; ++i) {
-        const float drySample = dry != nullptr ? dry[i] : wet[i];
-        wet[i] = drySample * (1.0f - dryWetMix) + wet[i] * dryWetMix;
+        const int sample = startSample + i;
+        const float drySample = dry != nullptr ? dry[i] : wet[sample];
+        wet[sample] = drySample * (1.0f - dryWetMix) + wet[sample] * dryWetMix;
       }
     }
   }
@@ -133,8 +148,8 @@ void MP3GlitchProcessor::process(juce::AudioBuffer<float> &buffer) {
   for (int ch = 0; ch < numChannels; ++ch) {
     float *channel = buffer.getWritePointer(ch);
     for (int i = 0; i < numSamples; ++i)
-      if (!std::isfinite(channel[i]))
-        channel[i] = 0.0f;
+      if (!std::isfinite(channel[startSample + i]))
+        channel[startSample + i] = 0.0f;
   }
 }
 
@@ -295,43 +310,51 @@ void MP3GlitchProcessor::dropFrame() {
   std::fill(frameBufferR.begin(), frameBufferR.begin() + MP3_FRAME_SIZE, 0.0f);
 }
 
-void MP3GlitchProcessor::applyPreEcho(juce::AudioBuffer<float> &buffer) {
+void MP3GlitchProcessor::applyPreEcho(juce::AudioBuffer<float> &buffer,
+                                      int startSample, int numSamples) {
   // MP3特有のプリエコーをシミュレート
   // トランジェント前に微弱な信号が漏れる現象
-  const int preEchoDelay = static_cast<int>(0.02 * sampleRate); // 20ms
+  const int desiredPreEchoDelay = static_cast<int>(0.02 * sampleRate); // 20ms
+  const int delaySize = static_cast<int>(preEchoDelayL.size());
+  const int preEchoDelay = std::clamp(desiredPreEchoDelay, 1, delaySize - 1);
   const float preEchoLevel = 0.15f * glitchAmount;
 
   float *leftChannel = buffer.getWritePointer(0);
   float *rightChannel =
       buffer.getNumChannels() > 1 ? buffer.getWritePointer(1) : nullptr;
 
-  for (int i = 0; i < buffer.getNumSamples(); ++i) {
-    int readPos = (preEchoWritePos - preEchoDelay + preEchoDelayL.size()) %
-                  preEchoDelayL.size();
+  for (int i = 0; i < numSamples; ++i) {
+    const int sample = startSample + i;
+    const int readPos = (preEchoWritePos - preEchoDelay + delaySize) % delaySize;
+    const auto readIndex = static_cast<size_t>(readPos);
+    const auto writeIndex = static_cast<size_t>(preEchoWritePos);
 
-    leftChannel[i] += preEchoDelayL[readPos] * preEchoLevel;
-    preEchoDelayL[preEchoWritePos] = leftChannel[i];
+    leftChannel[sample] += preEchoDelayL[readIndex] * preEchoLevel;
+    preEchoDelayL[writeIndex] = leftChannel[sample];
 
     if (rightChannel) {
-      rightChannel[i] += preEchoDelayR[readPos] * preEchoLevel;
-      preEchoDelayR[preEchoWritePos] = rightChannel[i];
+      rightChannel[sample] += preEchoDelayR[readIndex] * preEchoLevel;
+      preEchoDelayR[writeIndex] = rightChannel[sample];
     }
 
-    preEchoWritePos = (preEchoWritePos + 1) % preEchoDelayL.size();
+    preEchoWritePos = (preEchoWritePos + 1) % delaySize;
   }
 }
 
-void MP3GlitchProcessor::applyBandLimiting(juce::AudioBuffer<float> &buffer) {
+void MP3GlitchProcessor::applyBandLimiting(juce::AudioBuffer<float> &buffer,
+                                           int startSample, int numSamples) {
   // MP3の高域制限をシミュレート
   float *leftChannel = buffer.getWritePointer(0);
-  for (int i = 0; i < buffer.getNumSamples(); ++i) {
-    leftChannel[i] = lowpassFilterL.processSample(leftChannel[i]);
+  for (int i = 0; i < numSamples; ++i) {
+    const int sample = startSample + i;
+    leftChannel[sample] = lowpassFilterL.processSample(leftChannel[sample]);
   }
 
   if (buffer.getNumChannels() > 1) {
     float *rightChannel = buffer.getWritePointer(1);
-    for (int i = 0; i < buffer.getNumSamples(); ++i) {
-      rightChannel[i] = lowpassFilterR.processSample(rightChannel[i]);
+    for (int i = 0; i < numSamples; ++i) {
+      const int sample = startSample + i;
+      rightChannel[sample] = lowpassFilterR.processSample(rightChannel[sample]);
     }
   }
 }

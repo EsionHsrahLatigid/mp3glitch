@@ -8,6 +8,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <algorithm>
 #include <array>
 #include <random>
 #include <cmath>
@@ -39,6 +40,7 @@ private:
     void simulateMDCT(float* data, int size);
     void simulateIMDCT(float* data, int size);
     void corruptMDCTCoefficients(std::vector<float>& coeffs);
+    void processChunk(juce::AudioBuffer<float>& buffer, int startSample, int numSamples);
     
     // フレームベースの破壊
     void processFrame(float* leftData, float* rightData, int frameSize);
@@ -46,8 +48,8 @@ private:
     void dropFrame();
     
     // MP3特有のアーティファクト
-    void applyPreEcho(juce::AudioBuffer<float>& buffer);
-    void applyBandLimiting(juce::AudioBuffer<float>& buffer);
+    void applyPreEcho(juce::AudioBuffer<float>& buffer, int startSample, int numSamples);
+    void applyBandLimiting(juce::AudioBuffer<float>& buffer, int startSample, int numSamples);
     void applyQuantizationDistortion(float* data, int size);
     
     double sampleRate = 44100.0;
