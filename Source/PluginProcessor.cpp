@@ -246,7 +246,7 @@ void MP3GlitchProcessor::simulateMDCT(float *data, int size) {
   for (int k = 0; k < size; ++k) {
     float sum = 0.0f;
     for (int n = 0; n < size; ++n) {
-      float phase = static_cast<float>(M_PI) / size *
+      float phase = juce::MathConstants<float>::pi / static_cast<float>(size) *
                     (static_cast<float>(n) + 0.5f + size / 4.0f) *
                     (static_cast<float>(k) + 0.5f);
       sum += data[n] * std::cos(phase);
@@ -260,7 +260,7 @@ void MP3GlitchProcessor::simulateIMDCT(float *data, int size) {
   for (int n = 0; n < size; ++n) {
     float sum = 0.0f;
     for (int k = 0; k < size; ++k) {
-      float phase = static_cast<float>(M_PI) / size *
+      float phase = juce::MathConstants<float>::pi / static_cast<float>(size) *
                     (static_cast<float>(n) + 0.5f + size / 4.0f) *
                     (static_cast<float>(k) + 0.5f);
       sum += mdctCoeffs[k] * std::cos(phase);
