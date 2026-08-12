@@ -73,6 +73,15 @@ int main()
     passed &= check(!processor.producesMidi(), "processor should not produce MIDI");
     passed &= check(!processor.isMidiEffect(), "processor should be an audio effect");
 
+    std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
+    passed &= check(editor != nullptr, "editor should be constructible");
+    if (editor != nullptr)
+    {
+        passed &= check(editor->getWidth() == 640 && editor->getHeight() == 360,
+                        "editor should use the compact EHL default size");
+        passed &= check(editor->isResizable(), "editor should be safely resizable");
+    }
+
     juce::AudioProcessor::BusesLayout stereo;
     stereo.inputBuses.add(juce::AudioChannelSet::stereo());
     stereo.outputBuses.add(juce::AudioChannelSet::stereo());

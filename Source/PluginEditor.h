@@ -7,6 +7,8 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <ehl/juce_design/EhlDesign.h>
+
 #include "PluginProcessor.h"
 
 //==============================================================================
@@ -42,6 +44,10 @@ private:
     void timerCallback() override;
     
     MP3GlitchAudioProcessor& audioProcessor;
+    ehl::juce_design::LookAndFeel ehlLookAndFeel;
+    ehl::juce_design::ParameterDisplay parameterDisplay {
+        ehl::juce_design::DisplayKind::bitcrusher
+    };
     
     // スライダー
     GlitchSlider glitchAmountSlider;
@@ -53,10 +59,7 @@ private:
     GlitchSlider mdctSmearSlider;
     GlitchSlider mixSlider;
     
-    // グリッチビジュアライザー用
-    std::vector<float> visualizerData;
-    int visualizerPhase = 0;
-    float currentGlitchLevel = 0.0f;
+    void updateDisplay();
     
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MP3GlitchAudioProcessorEditor)
 };
