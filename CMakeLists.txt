@@ -187,6 +187,7 @@ if(MP3GLITCH_BUILD_PLUGIN)
         add_test(
             NAME MP3GlitchArtifactChecks
             COMMAND ${CMAKE_COMMAND}
+                    -DBUILD_CONFIG=$<CONFIG>
                     -DSTAGE_DIR=${ehl_staged_products}
                     -DSLUG=mp3glitch
                     -DEXPECT_AU=$<BOOL:${APPLE}>
